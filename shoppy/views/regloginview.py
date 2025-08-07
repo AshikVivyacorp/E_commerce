@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import logging
 import sys
 from rest_framework.views import APIView
@@ -312,3 +313,167 @@ class LogoutView(APIView):
             }
             logger.error("Internal server error in LogoutView", exc_info=True)
             return Response(data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+=======
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from knox.models import AuthToken
+from knox.views import LogoutView as KnoxLogoutView
+from knox.auth import TokenAuthentication
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth.hashers import make_password
+from drf_yasg.utils import swagger_auto_schema
+
+from shoppy.models import User, OTP
+from shoppy.serializer import (
+    RegistrationSerializer, LoginSerializer,
+    OTPVerifySerializer, ResendOTPSerializer
+)
+from shoppy.utils import (
+    generate_otp, send_otp_email, is_otp_valid,
+    create_user_session, build_response, get_logger
+)
+
+_logger = get_logger()
+
+
+class RegisterView(APIView):
+    @swagger_auto_schema(request_body=RegistrationSerializer)
+    def post(self, request):
+        serializer = RegistrationSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            if User.objects.filter(email=email).exists():
+                _logger.warning(f"User with email {email} already exists")
+                return Response(build_response(
+                    400, "Failed", "User already exists", statusFlag=False
+                ), status=400)
+
+            serializer.validated_data["password"] = make_password(serializer.validated_data["password"])
+            user = serializer.save()
+
+            if email == "admin@emarket.com":
+                user.is_admin = True
+                user.is_superuser = True
+                user.is_staff = True
+                user.save()
+
+            otp = generate_otp()
+            OTP.objects.create(user=user, code=otp)
+            send_otp_email(email, otp)
+
+            _logger.info(f"User registered: {email}")
+            return Response(build_response(
+                201, "Success", "User registered. OTP sent."
+            ), status=201)
+
+        _logger.error(f"Registration failed: {serializer.errors}")
+        return Response(build_response(
+            400, "Failed", "Invalid data", data=serializer.errors, statusFlag=False
+        ), status=400)
+
+
+class LoginView(APIView):
+    @swagger_auto_schema(request_body=LoginSerializer, security=[])
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                _logger.warning(f"Login failed: {email} not found")
+                return Response(build_response(
+                    404, "Failed", "User not found. Please register first.", statusFlag=False
+                ), status=404)
+
+            otp = generate_otp()
+            OTP.objects.create(user=user, code=otp)
+            send_otp_email(email, otp)
+
+            _logger.info(f"OTP sent to: {email}")
+            return Response(build_response(
+                200, "Success", "OTP sent to your email"
+            ))
+
+        _logger.error(f"Login failed: {serializer.errors}")
+        return Response(build_response(
+            400, "Failed", "Invalid data", data=serializer.errors, statusFlag=False
+        ), status=400)
+
+
+class VerifyOTP(APIView):
+    @swagger_auto_schema(request_body=OTPVerifySerializer, security=[])
+    def post(self, request):
+        serializer = OTPVerifySerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            otp_code = serializer.validated_data["otp"]
+
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                _logger.warning(f"OTP verification failed: {email} not registered")
+                return Response(build_response(
+                    404, "Failed", "Invalid user. Please register first.", statusFlag=False
+                ), status=404)
+
+            if not is_otp_valid(user, otp_code):
+                _logger.warning(f"Invalid/expired OTP for {email}")
+                return Response(build_response(
+                    400, "Failed", "Invalid or expired OTP", statusFlag=False
+                ), status=400)
+
+            token = AuthToken.objects.create(user)[1]
+            create_user_session(user, request)
+            _logger.info(f"OTP verified for {email}")
+            return Response(build_response(
+                200, "Success", "OTP verified successfully", data={"token": token}
+            ))
+
+        _logger.error(f"OTP verification failed: {serializer.errors}")
+        return Response(build_response(
+            400, "Failed", "Invalid data", data=serializer.errors, statusFlag=False
+        ), status=400)
+
+
+class ResendOTP(APIView):
+    @swagger_auto_schema(request_body=ResendOTPSerializer, security=[])
+    def post(self, request):
+        serializer = ResendOTPSerializer(data=request.data)
+        if serializer.is_valid():
+            email = serializer.validated_data["email"]
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                _logger.warning(f"Resend OTP failed: {email} not found")
+                return Response(build_response(
+                    404, "Failed", "User not found. Please register first.", statusFlag=False
+                ), status=404)
+
+            otp = generate_otp()
+            OTP.objects.create(user=user, code=otp)
+            send_otp_email(email, otp)
+
+            _logger.info(f"OTP resent to: {email}")
+            return Response(build_response(
+                200, "Success", "OTP resent to your email"
+            ))
+
+        _logger.error(f"Resend OTP failed: {serializer.errors}")
+        return Response(build_response(
+            400, "Failed", "Invalid data", data=serializer.errors, statusFlag=False
+        ), status=400)
+
+
+class LogoutView(KnoxLogoutView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, format=None):
+        super().post(request, format=None)
+        _logger.info(f"User {request.user.email} logged out")
+        return Response(build_response(
+            200, "Success", "Logged out successfully"
+        ))
+>>>>>>> 987dbcd (Initial project setup with working Django e-commerce backend)

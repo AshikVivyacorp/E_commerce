@@ -12,6 +12,30 @@ from reportlab.pdfgen import canvas
 
 from .models import OTP, Product, UserSession, Invoice, User, Cart
 
+<<<<<<< HEAD
+=======
+import logging
+import sys
+
+_logger = logging.getLogger(__name__)
+_logger.setLevel(logging.DEBUG)
+_logger.addHandler(logging.StreamHandler(sys.stdout))
+
+def build_response(response_code=200, status='Success', message='', data=None, errorDetails=None, statusFlag=True):
+    return {
+        'response_code': response_code,
+        'status': status,
+        'message': message,
+        'statusFlag': statusFlag,
+        'errorDetails': errorDetails,
+        'data': data if data is not None else {}
+    }
+
+def get_logger():
+    return _logger
+
+
+>>>>>>> 987dbcd (Initial project setup with working Django e-commerce backend)
 # ----------------------- OTP Functions -----------------------
 
 def generate_otp():
@@ -31,11 +55,36 @@ def send_otp_email(email, otp):
     message = f"Your OTP is: {otp}. It is valid for 5 minutes."
     EmailMessage(subject, message, to=[email]).send()
 
+<<<<<<< HEAD
 def notify_admin_out_of_stock(product):
     subject = f"Product Out of Stock: {product.name}"
     message = f"The product '{product.name}' is out of stock."
     admin_email = "ashik1682003@gmail.com"
     EmailMessage(subject, message, to=[admin_email]).send()
+=======
+
+def notify_admin_out_of_stock(product):
+    subject = f" Out of Stock Alert: {product.name}"
+    message = (
+        f"Dear Admin,\n\n"
+        f"The product '{product.name}' is out of stock on E-Market.\n"
+        f"Please restock it at the earliest.\n\n"
+        f"Regards,\nE-Market System"
+    )
+
+    try:
+        email_msg = EmailMessage(
+            subject,
+            message,
+            settings.EMAIL_HOST_USER,  # From
+            ['ashik1682003@gmail.com']  # To: Admin email
+        )
+        email_msg.send(fail_silently=False)
+        _logger.info(f"Out-of-stock email sent for product {product.name}")
+    except Exception as e:
+        _logger.error(f"Failed to send out-of-stock email for {product.name}: {e}")
+
+>>>>>>> 987dbcd (Initial project setup with working Django e-commerce backend)
 
 def notify_users_product_restocked(product):
     subject = f"Product Restocked: {product.name}"

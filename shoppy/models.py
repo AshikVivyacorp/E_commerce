@@ -157,3 +157,33 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - {self.ip_address}"
+<<<<<<< HEAD
+=======
+
+# -------------------- Shipment Tracking --------------------
+
+class ShipmentTracking(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.CASCADE, related_name='tracking')
+    tracking_number = models.CharField(max_length=100, unique=True)
+    carrier = models.CharField(max_length=100)
+    estimated_delivery = models.DateField(null=True, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
+    status = models.CharField(
+        max_length=50,
+        choices=[
+            ('Label Created', 'Label Created'),
+            ('Shipped', 'Shipped'),
+            ('In Transit', 'In Transit'),
+            ('Out for Delivery', 'Out for Delivery'),
+            ('Delivered', 'Delivered'),
+            ('Exception', 'Exception'),
+        ],
+        default='Label Created'
+    )
+    current_location = models.CharField(max_length=255, blank=True, null=True)
+    remarks = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.order.invoice_id} - {self.tracking_number}"
+
+>>>>>>> 987dbcd (Initial project setup with working Django e-commerce backend)
